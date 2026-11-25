@@ -1,5 +1,11 @@
 package model.entity;
 
+/**
+ * Choices.java
+ *
+ * Defines the allowed flow, mood and symptom choices shared by forms and validation. Keeping
+ * these values together helps the interface and input checks agree.
+ */
 public final class Choices {
     private Choices() {}
 

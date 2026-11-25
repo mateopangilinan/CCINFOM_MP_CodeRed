@@ -1,16 +1,23 @@
 package model.dao;
 
-import model.entity.*;
-
 import java.math.BigDecimal;
 import java.sql.*;
 import java.time.LocalDate;
 import java.util.*;
+import model.entity.*;
 
+/**
+ * UserDao.java
+ *
+ * Contains SQL for accounts, password-hash lookup, account locks, related-record counts and
+ * cached averages. It uses connections supplied by services and applies ownership restrictions to
+ * scoped queries.
+ */
 public final class UserDao {
     private static final String COLUMNS =
             "user_id,name,email,avg_cycle_length,avg_period_length,created_at,role";
 
+    // Convert one database row into an entity, preserving optional values as null.
     private User read(ResultSet r) throws SQLException {
         return new User(
                 r.getInt("user_id"),
@@ -22,6 +29,7 @@ public final class UserDao {
                 r.getString("role"));
     }
 
+    // Find an account by normalized email for the login service.
     public User byEmail(Connection c, String email) throws SQLException {
         try (var p = Jdbc.statement(c, "SELECT " + COLUMNS + " FROM users WHERE email=?", email);
                 var r = p.executeQuery()) {
@@ -33,6 +41,7 @@ public final class UserDao {
         }
     }
 
+    // Read the stored hash only for password checks; it is never part of a User entity.
     public String password(Connection c, int id) throws SQLException {
         try (var p = Jdbc.statement(c, "SELECT password FROM users WHERE user_id=?", id);
                 var r = p.executeQuery()) {
@@ -44,6 +53,7 @@ public final class UserDao {
         }
     }
 
+    // Look up one ID and apply the ownership condition in the same SQL query.
     public User find(Connection c, int id, int scope) throws SQLException {
         try (var p =
                         Jdbc.statement(
@@ -63,6 +73,7 @@ public final class UserDao {
         }
     }
 
+    // Return only the rows allowed by scope and the selected filters.
     public List<User> list(Connection c, int scope, Integer owner, LocalDate from, LocalDate until)
             throws SQLException {
         List<User> rows = new ArrayList<>();
@@ -88,6 +99,7 @@ public final class UserDao {
         return rows;
     }
 
+    // Insert the supplied values using the service's Connection and return the new ID.
     public int insert(
             Connection c, String name, String email, String hash, String role, LocalDate date)
             throws SQLException {
@@ -104,6 +116,7 @@ public final class UserDao {
         }
     }
 
+    // Update the permitted row using bound values; the service controls the transaction.
     public void update(
             Connection c, int id, int scope, String name, String email, String role, String hash)
             throws SQLException {
@@ -123,6 +136,7 @@ public final class UserDao {
         }
     }
 
+    // Delete only a row allowed by scope; related rows follow the schema's foreign-key rules.
     public void delete(Connection c, int id, int scope) throws SQLException {
         try (var p =
                 Jdbc.statement(
@@ -135,6 +149,7 @@ public final class UserDao {
         }
     }
 
+    // Lock this account row until the surrounding service transaction finishes.
     public boolean lock(Connection c, int id, int scope) throws SQLException {
         try (var p =
                         Jdbc.statement(
@@ -149,6 +164,7 @@ public final class UserDao {
         }
     }
 
+    // Lock the admin rows in ID order so concurrent edits cannot remove every admin.
     public int lockAdmins(Connection c) throws SQLException {
         int count = 0;
         try (var p =
@@ -162,6 +178,7 @@ public final class UserDao {
         return count;
     }
 
+    // Save both calculated averages using the same transaction as the cycle change.
     public void averages(Connection c, int id, BigDecimal cycle, BigDecimal period)
             throws SQLException {
         try (var p =
@@ -175,6 +192,7 @@ public final class UserDao {
         }
     }
 
+    // Count the related records so the controller can explain the effect of deleting an account.
     public int[] affected(Connection c, int id, int scope) throws SQLException {
         try (var p =
                         Jdbc.statement(
